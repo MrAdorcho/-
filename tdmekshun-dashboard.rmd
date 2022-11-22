@@ -1,0 +1,68 @@
+---
+title: "Анализ лаунжей в аэропортах"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(flexdashboard)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+source("~/shared/minor2_2022/1-Intro/hw1/hw1_data.R")
+
+airline = hw1_get_data(df_name = "airline")
+airport = hw1_get_data(df_name = "airport")
+lounge = hw1_get_data(df_name = "lounge")
+seat = hw1_get_data(df_name = "seat")
+```
+
+Column {data-width=550}
+-----------------------------------------------------------------------
+
+### Chart A
+
+```{r echo = F, message=FALSE, warning=FALSE}
+airport_rate = airport
+airport_rate$airport_name = str_replace_all(airport_rate$airport_name, '-', ' ')
+lounge_rate = lounge
+lounge_rate$airport=str_to_lower(lounge_rate$airport)
+names(airport_rate)[names(airport_rate) == 'airport_name'] = 'airport'
+lounge_rate = filter(lounge_rate, !is.na(airport))
+airport_rate = filter(airport_rate, !is.na(airport))
+common_rate= inner_join(airport_rate,lounge_rate,by= 'airport')
+common_rate = common_rate[c('airport', 'recommended.x', 'lounge_type')]
+common_rate = common_rate %>% filter(!is.na(lounge_type)) %>% group_by(airport, lounge_type) %>% summarise(counter=sum(recommended.x)) %>% arrange(-counter)
+
+ggplot(data=common_rate) + geom_col(aes(x=lounge_type, y=counter, fill = lounge_type)) + xlab('Тип лаунжа') + ylab('Колличество рекоменаций аэропорта') + labs(title='Зависимость колличества рекомендаций аэропорта',subtitle='от типа лаунжа')
+```
+
+Column {data-width=450}
+-----------------------------------------------------------------------
+
+### Аэропорт с самым рекомендованным бизнесс-класс лаунжем
+
+```{r echo = F, message=FALSE, warning=FALSE}
+best_rec_launge  = lounge %>% filter(lounge_type == 'Business Class') %>% group_by(airport) %>% summarise(recommends = sum(recommended)) %>% arrange(-recommends) %>% head(1)
+valueBox((best_rec_launge$airport), icon = "fa-plane")
+
+```
+
+### Chart B
+
+```{r echo = F, message=FALSE, warning=FALSE}
+dash_rating_lounge = lounge %>% filter (!is.na(lounge_name)) %>% filter(!is.na(overall_rating)) %>% group_by(lounge_name) %>% summarise(sum_rating = sum(overall_rating)) %>% arrange(-sum_rating) %>% head(5)
+dash_rating_lounge$lounge_name=str_remove_all(dash_rating_lounge$lounge_name, 'REVIEW')
+ggplot(data=dash_rating_lounge) + geom_col(aes(x=lounge_name, y=sum_rating)) + theme(axis.text.x = element_text(angle = 45 , vjust = 1 , hjust= 1 )) + xlab('Имя лаунжа') + ylab('Сумма рейтинга') + geom_bar(top_n(dash_rating_lounge, sum_rating, n = 1), mapping = aes(x =lounge_name , y = sum_rating), stat = "identity", fill = "red") + labs(title='ТОП-5 лаунжей с самым большим рейтингом')
+
+```
+
+### ЛАУНЖА
+
+```{r echo = F, message=FALSE, warning=FALSE}
+valueBox(length(unique(lounge$lounge_name)), icon = "fa-list-ul")
+
+```
